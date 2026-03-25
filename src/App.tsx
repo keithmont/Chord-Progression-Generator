@@ -82,9 +82,9 @@ export default function App() {
     setIsCustom(false);
   };
 
-  useEffect(() => {
-    handleGenerate();
-  }, [selectedKey, selectedProgression]);
+  // useEffect(() => {
+  //   handleGenerate();
+  // }, [selectedKey, selectedProgression]);
 
   const toggleChordInBuilder = (voicing: any, setIdx: number, vIdx: number) => {
     const chordId = `${voicing.chordName}-${setIdx}-${vIdx}`;
@@ -230,6 +230,18 @@ export default function App() {
           </div>
         </section>
 
+        {/* Generate Button */}
+        <div className="flex justify-center mb-12">
+          <button
+            onClick={handleGenerate}
+            disabled={isLoading}
+            className="group flex items-center gap-3 bg-blue-600 text-white px-10 py-4 rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100"
+          >
+            <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
+            {voicingSets.length > 0 ? 'Regenerate Voicings' : 'Generate Voicings'}
+          </button>
+        </div>
+
         {/* Custom Progression Builder Section */}
         <CustomProgressionBuilder 
           chords={customChords}
@@ -239,89 +251,91 @@ export default function App() {
         />
 
         {/* Results Section */}
-        <section>
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Voicing Options</h2>
-              <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-xs font-bold border border-blue-100 dark:border-blue-800">
-                <Music className="w-3 h-3" />
-                <span>CLICK TO STRUM</span>
+        {voicingSets.length > 0 || isLoading ? (
+          <section>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Voicing Options</h2>
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-xs font-bold border border-blue-100 dark:border-blue-800">
+                  <Music className="w-3 h-3" />
+                  <span>CLICK TO STRUM</span>
+                </div>
               </div>
+              {isLoading && (
+                <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 animate-pulse">
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span className="text-sm font-medium">Generating...</span>
+                </div>
+              )}
             </div>
-            {isLoading && (
-              <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 animate-pulse">
-                <RefreshCw className="w-4 h-4 animate-spin" />
-                <span className="text-sm font-medium">Generating...</span>
+
+            {error && (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400 p-4 rounded-xl mb-8 flex items-center gap-3">
+                <Info className="w-5 h-5" />
+                <p className="text-sm font-medium">{error}</p>
               </div>
             )}
-          </div>
 
-          {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400 p-4 rounded-xl mb-8 flex items-center gap-3">
-              <Info className="w-5 h-5" />
-              <p className="text-sm font-medium">{error}</p>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 gap-12">
-            <AnimatePresence mode="wait">
-              {voicingSets.map((set, setIdx) => (
-                <motion.div
-                  key={`${set.name}-${setIdx}`}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ delay: setIdx * 0.1 }}
-                  className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800"
-                >
-                  <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-                    <div>
-                      <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1">{set.name}</h3>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">{set.description}</p>
-                    </div>
-                    <button
-                      onClick={() => playProgression(set.voicings.map(v => v.frets))}
-                      className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-bold text-sm hover:text-blue-700 dark:hover:text-blue-300 transition-colors bg-blue-50 dark:bg-blue-900/20 px-4 py-2 rounded-xl border border-blue-100 dark:border-blue-900/30"
-                    >
-                      <Play className="w-4 h-4 fill-current" />
-                      Play Progression
-                    </button>
-                  </div>
-                  
-                  <div className="flex flex-wrap gap-8 justify-center sm:justify-start">
-                    {set.voicings.map((voicing, vIdx) => (
-                      <div key={vIdx} className="relative group">
-                        <ChordChart 
-                          chord={voicing} 
-                          onClick={() => playChord(voicing.frets)}
-                          onAddToggle={() => toggleChordInBuilder(voicing, setIdx, vIdx)}
-                          isAdded={!!customChords.find(c => c.id === `${voicing.chordName}-${setIdx}-${vIdx}`)}
-                        />
-                        {vIdx < set.voicings.length - 1 && (
-                          <div className="hidden lg:flex absolute -right-5 top-1/2 -translate-y-1/2 text-slate-200 dark:text-slate-700">
-                            <ChevronRight className="w-5 h-5" />
-                          </div>
-                        )}
+            <div className="grid grid-cols-1 gap-12">
+              <AnimatePresence mode="wait">
+                {voicingSets.map((set, setIdx) => (
+                  <motion.div
+                    key={`${set.name}-${setIdx}`}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ delay: setIdx * 0.1 }}
+                    className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800"
+                  >
+                    <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1">{set.name}</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">{set.description}</p>
                       </div>
-                    ))}
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
+                      <button
+                        onClick={() => playProgression(set.voicings.map(v => v.frets))}
+                        className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-bold text-sm hover:text-blue-700 dark:hover:text-blue-300 transition-colors bg-blue-50 dark:bg-blue-900/20 px-4 py-2 rounded-xl border border-blue-100 dark:border-blue-900/30"
+                      >
+                        <Play className="w-4 h-4 fill-current" />
+                        Play Progression
+                      </button>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-8 justify-center sm:justify-start">
+                      {set.voicings.map((voicing, vIdx) => (
+                        <div key={vIdx} className="relative group">
+                          <ChordChart 
+                            chord={voicing} 
+                            onClick={() => playChord(voicing.frets)}
+                            onAddToggle={() => toggleChordInBuilder(voicing, setIdx, vIdx)}
+                            isAdded={!!customChords.find(c => c.id === `${voicing.chordName}-${setIdx}-${vIdx}`)}
+                          />
+                          {vIdx < set.voicings.length - 1 && (
+                            <div className="hidden lg:flex absolute -right-5 top-1/2 -translate-y-1/2 text-slate-200 dark:text-slate-700">
+                              <ChevronRight className="w-5 h-5" />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          </section>
+        ) : (
+          <div className="bg-white dark:bg-slate-900 p-12 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 text-center">
+            <div className="bg-slate-50 dark:bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Guitar className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-2">Ready to Architect?</h3>
+            <p className="text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+              Select your key and progression above, then click "Generate Voicings" to see your options.
+            </p>
           </div>
-        </section>
+        )}
 
-        {/* Regenerate Button */}
-        <div className="mt-16 flex justify-center">
-          <button
-            onClick={handleGenerate}
-            disabled={isLoading}
-            className="group flex items-center gap-3 bg-blue-600 text-white px-8 py-4 rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100"
-          >
-            <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-            Regenerate Voicings
-          </button>
-        </div>
+        {/* Regenerate Button removed from here as it's now above */}
       </main>
 
       {/* Footer Info */}

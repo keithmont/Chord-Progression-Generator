@@ -9,10 +9,10 @@ function getAudioContext() {
   return audioCtx;
 }
 
-export function playChord(frets: (number | "x")[]) {
+export async function playChord(frets: (number | "x")[]) {
   const ctx = getAudioContext();
   if (ctx.state === 'suspended') {
-    ctx.resume();
+    await ctx.resume();
   }
 
   const now = ctx.currentTime;
@@ -29,7 +29,7 @@ export function playChord(frets: (number | "x")[]) {
 export async function playProgression(progression: (number | "x")[][], bpm: number = 80) {
   const ctx = getAudioContext();
   if (ctx.state === 'suspended') {
-    ctx.resume();
+    await ctx.resume();
   }
 
   const secondsPerBeat = 60 / bpm;

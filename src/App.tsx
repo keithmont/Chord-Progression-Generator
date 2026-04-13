@@ -102,58 +102,56 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans pb-20 transition-colors duration-300">
+    <div className="min-h-screen pb-20 transition-colors duration-300">
       {/* Header */}
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="bg-blue-600 p-2 rounded-lg">
-              <Guitar className="text-white w-6 h-6" />
-            </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-800 dark:text-slate-100">Chord Architect</h1>
+      <header className="bg-white zine-border border-t-0 border-l-0 border-r-0 sticky top-0 z-30">
+        <div className="max-w-6xl mx-auto px-4 py-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tighter text-black uppercase">Find Your Voicing</h1>
           </div>
           
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-            >
-              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
-            <div className="text-xs font-medium text-slate-400 uppercase tracking-widest hidden sm:block">
-              Guitar Voicing Generator
+          <div className="flex items-center gap-6">
+            <div className="text-xs font-bold text-black uppercase tracking-[0.2em] hidden sm:flex items-center gap-4">
+              <span>Guitar Voicing Assistant</span>
+              <button
+                onClick={() => setDarkMode(!darkMode)}
+                className="p-1.5 zine-border bg-white hover:bg-black hover:text-white transition-colors"
+                aria-label="Toggle theme"
+              >
+                {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8">
+      <main className="max-w-6xl mx-auto px-4 py-12">
         {/* Controls Section */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-16">
           {/* Key Selection */}
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
+          <div className="zine-card p-8">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Music className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                <h2 className="font-semibold text-slate-700 dark:text-slate-200">Select Key</h2>
+                <Music className="w-6 h-6 text-black" />
+                <h2 className="text-xl font-bold text-black">Select Key</h2>
               </div>
               <button
                 onClick={surpriseKey}
-                className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1"
+                className="text-xs font-bold text-black hover:underline flex items-center gap-1 uppercase tracking-widest"
               >
                 <RefreshCw className="w-3 h-3" />
                 Surprise Me
               </button>
             </div>
-            <div className="grid grid-cols-5 gap-2">
+            <div className="grid grid-cols-5 gap-3">
               {KEYS.map((k) => (
                 <button
                   key={k}
                   onClick={() => setSelectedKey(k)}
-                  className={`py-2 rounded-lg text-sm font-medium transition-all ${
+                  className={`py-3 text-sm font-bold transition-all zine-border ${
                     selectedKey === k
-                      ? 'bg-blue-600 text-white shadow-md shadow-blue-200 dark:shadow-none'
-                      : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                      ? 'bg-black text-white'
+                      : 'bg-white text-black hover:bg-[#F5F5DC]'
                   }`}
                 >
                   {k}
@@ -163,22 +161,22 @@ export default function App() {
           </div>
 
           {/* Progression Selection */}
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
+          <div className="zine-card p-8">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <ChevronRight className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                <h2 className="font-semibold text-slate-700 dark:text-slate-200">Progression</h2>
+                <ChevronRight className="w-6 h-6 text-black" />
+                <h2 className="text-xl font-bold text-black">Progression</h2>
               </div>
               <button
                 onClick={surpriseProgression}
-                className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 flex items-center gap-1"
+                className="text-xs font-bold text-black hover:underline flex items-center gap-1 uppercase tracking-widest"
               >
                 <RefreshCw className="w-3 h-3" />
                 Surprise Me
               </button>
             </div>
             
-            <div className="space-y-4">
+            <div className="space-y-6">
               <select
                 disabled={isCustom}
                 value={selectedProgression}
@@ -189,7 +187,7 @@ export default function App() {
                     setSelectedProgression(e.target.value);
                   }
                 }}
-                className="w-full p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50 text-slate-700 dark:text-slate-200"
+                className="w-full zine-select text-sm font-bold uppercase tracking-tight"
               >
                 {COMMON_PROGRESSIONS.map((p) => (
                   <option key={p.value} value={p.value}>{p.label}</option>
@@ -197,30 +195,36 @@ export default function App() {
               </select>
 
               <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="custom-toggle"
-                  checked={isCustom}
-                  onChange={(e) => setIsCustom(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 bg-transparent"
-                />
-                <label htmlFor="custom-toggle" className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                <div className="relative flex items-center">
+                  <input
+                    type="checkbox"
+                    id="custom-toggle"
+                    checked={isCustom}
+                    onChange={(e) => setIsCustom(e.target.checked)}
+                    className="peer sr-only"
+                  />
+                  <div className="w-5 h-5 border-2 border-black rounded-none peer-checked:bg-black transition-all"></div>
+                  <svg className="absolute w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none left-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
+                <label htmlFor="custom-toggle" className="text-sm font-bold text-black uppercase tracking-widest cursor-pointer">
                   Custom Progression
                 </label>
               </div>
 
               {isCustom && (
-                <div className="flex gap-2">
+                <div className="flex gap-3">
                   <input
                     type="text"
-                    placeholder="e.g. I - IV - vi - V"
+                    placeholder="E.G. I - IV - VI - V"
                     value={customProgression}
                     onChange={(e) => setCustomProgression(e.target.value)}
-                    className="flex-1 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 dark:text-slate-200"
+                    className="flex-1 zine-input text-sm font-bold uppercase"
                   />
                   <button
                     onClick={handleGenerate}
-                    className="bg-slate-800 dark:bg-slate-700 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-slate-700 dark:hover:bg-slate-600 transition-colors"
+                    className="zine-button py-2 px-6"
                   >
                     Apply
                   </button>
@@ -230,15 +234,16 @@ export default function App() {
           </div>
         </section>
 
+
         {/* Generate Button */}
-        <div className="flex justify-center mb-12">
+        <div className="flex justify-center mb-16">
           <button
             onClick={handleGenerate}
             disabled={isLoading}
-            className="group flex items-center gap-3 bg-blue-600 text-white px-10 py-4 rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 hover:scale-105 transition-all disabled:opacity-50 disabled:hover:scale-100"
+            className="zine-button px-12 py-5 text-xl flex items-center gap-4 group"
           >
-            <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-            {voicingSets.length > 0 ? 'Regenerate Voicings' : 'Generate Voicings'}
+            <RefreshCw className={`w-6 h-6 ${isLoading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
+            {voicingSets.length > 0 ? 'Regenerate' : 'Generate'}
           </button>
         </div>
 
@@ -253,55 +258,57 @@ export default function App() {
         {/* Results Section */}
         {voicingSets.length > 0 || isLoading ? (
           <section>
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Voicing Options</h2>
-                <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-xs font-bold border border-blue-100 dark:border-blue-800">
-                  <Music className="w-3 h-3" />
-                  <span>CLICK TO STRUM</span>
-                </div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-10 gap-4">
+              <div className="flex items-center gap-4">
+                <h2 className="text-3xl font-bold text-black">Voicing Options</h2>
               </div>
-              {isLoading && (
-                <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 animate-pulse">
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span className="text-sm font-medium">Generating...</span>
-                </div>
-              )}
             </div>
 
-            {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400 p-4 rounded-xl mb-8 flex items-center gap-3">
-                <Info className="w-5 h-5" />
-                <p className="text-sm font-medium">{error}</p>
+            {isLoading && (
+              <div className="flex flex-col items-center justify-center py-12 zine-card mb-12">
+                <dotlottie-wc 
+                  src="https://lottie.host/a7eca740-9b96-4804-9b2c-9bfdb70550dc/Fy8ued9bPa.lottie" 
+                  style={{ width: '200px', height: '200px' }} 
+                  autoplay 
+                  loop
+                />
+                <span className="text-xl font-bold uppercase tracking-[0.2em] mt-4 text-black">Architecting...</span>
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-12">
+            {error && (
+              <div className="zine-border bg-white p-6 mb-12 flex items-center gap-4">
+                <Info className="w-6 h-6 text-black" />
+                <p className="text-sm font-bold uppercase tracking-tight">{error}</p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-16">
               <AnimatePresence mode="wait">
                 {voicingSets.map((set, setIdx) => (
                   <motion.div
                     key={`${set.name}-${setIdx}`}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ delay: setIdx * 0.1 }}
-                    className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="zine-card p-10"
                   >
-                    <div className="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                    <div className="mb-10 flex flex-col sm:flex-row sm:items-start justify-between gap-6">
                       <div>
-                        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1">{set.name}</h3>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">{set.description}</p>
+                        <h3 className="text-2xl font-bold text-black mb-2">{set.name}</h3>
+                        <p className="text-xs font-bold text-black opacity-60 uppercase tracking-widest max-w-2xl">{set.description}</p>
                       </div>
                       <button
                         onClick={() => playProgression(set.voicings.map(v => v.frets))}
-                        className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-bold text-sm hover:text-blue-700 dark:hover:text-blue-300 transition-colors bg-blue-50 dark:bg-blue-900/20 px-4 py-2 rounded-xl border border-blue-100 dark:border-blue-900/30"
+                        className="zine-button flex items-center gap-2 whitespace-nowrap"
                       >
                         <Play className="w-4 h-4 fill-current" />
                         Play Progression
                       </button>
                     </div>
                     
-                    <div className="flex flex-wrap gap-8 justify-center sm:justify-start">
+                    <div className="flex flex-wrap gap-10 justify-center sm:justify-start">
                       {set.voicings.map((voicing, vIdx) => (
                         <div key={vIdx} className="relative group">
                           <ChordChart 
@@ -311,8 +318,8 @@ export default function App() {
                             isAdded={!!customChords.find(c => c.id === `${voicing.chordName}-${setIdx}-${vIdx}`)}
                           />
                           {vIdx < set.voicings.length - 1 && (
-                            <div className="hidden lg:flex absolute -right-5 top-1/2 -translate-y-1/2 text-slate-200 dark:text-slate-700">
-                              <ChevronRight className="w-5 h-5" />
+                            <div className="hidden xl:flex absolute -right-6 top-1/2 -translate-y-1/2 text-black opacity-20">
+                              <ChevronRight className="w-6 h-6" />
                             </div>
                           )}
                         </div>
@@ -324,13 +331,10 @@ export default function App() {
             </div>
           </section>
         ) : (
-          <div className="bg-white dark:bg-slate-900 p-12 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 text-center">
-            <div className="bg-slate-50 dark:bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Guitar className="w-8 h-8 text-slate-300 dark:text-slate-600" />
-            </div>
-            <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300 mb-2">Ready to Architect?</h3>
-            <p className="text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-              Select your key and progression above, then click "Generate Voicings" to see your options.
+          <div className="zine-card p-16 text-center border-dashed">
+            <h3 className="text-2xl font-bold text-black mb-4">Ready to Architect?</h3>
+            <p className="text-xs font-bold text-black opacity-60 uppercase tracking-[0.2em] max-w-md mx-auto leading-relaxed">
+              Select your key and progression above, then click "Generate" to see your options.
             </p>
           </div>
         )}
@@ -339,8 +343,8 @@ export default function App() {
       </main>
 
       {/* Footer Info */}
-      <footer className="max-w-6xl mx-auto px-4 py-8 border-t border-slate-200 dark:border-slate-800 mt-12 text-center">
-        <p className="text-slate-400 dark:text-slate-500 text-sm">
+      <footer className="max-w-6xl mx-auto px-4 py-12 border-t-4 border-black mt-20 text-center">
+        <p className="text-black font-bold text-xs uppercase tracking-[0.3em] leading-loose">
           Explore different ways to play your favorite progressions. 
           <br className="hidden sm:block" />
           Charts show fret numbers on the left and muted strings with an 'X'.

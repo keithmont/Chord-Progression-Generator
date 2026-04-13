@@ -26,32 +26,32 @@ export const ChordChart: React.FC<ChordChartProps> = ({ chord, onClick, onAddTog
     <div className="flex flex-col items-center gap-2">
       <button 
         onClick={onClick}
-        className="flex flex-col items-center p-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 w-32 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md hover:scale-105 transition-all cursor-pointer group active:scale-95"
+        className="flex flex-col items-center p-4 bg-white zine-border w-36 hover:bg-[#F5F5DC] transition-all cursor-pointer group active:translate-x-[2px] active:translate-y-[2px]"
         aria-label={`Play ${chordName} chord`}
       >
-        <span className="text-sm font-bold mb-2 text-slate-800 dark:text-slate-100 truncate w-full text-center group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{chordName}</span>
+        <span className="text-lg font-bold mb-3 text-black uppercase tracking-tighter truncate w-full text-center">{chordName}</span>
         <svg width="120" height="160" viewBox="0 0 120 160" className="overflow-visible">
           {/* Fretboard background */}
-          <rect x="10" y="20" width="100" height="125" fill="none" stroke="currentColor" className="text-slate-300 dark:text-slate-600" strokeWidth="1" />
+          <rect x="10" y="20" width="100" height="125" fill="none" stroke="black" strokeWidth="2" />
           
           {/* Nut (if startFret is 1) */}
           {startFret === 1 && (
-            <line x1="10" y1="20" x2="110" y2="20" stroke="currentColor" className="text-slate-800 dark:text-slate-200" strokeWidth="4" />
+            <line x1="10" y1="20" x2="110" y2="20" stroke="black" strokeWidth="6" />
           )}
 
           {/* Frets */}
           {fretY.map((y, i) => (
-            <line key={`fret-${i}`} x1="10" y1={y} x2="110" y2={y} stroke="currentColor" className="text-slate-300 dark:text-slate-600" strokeWidth="1" />
+            <line key={`fret-${i}`} x1="10" y1={y} x2="110" y2={y} stroke="black" strokeWidth="2" />
           ))}
 
           {/* Strings */}
           {stringX.map((x, i) => (
-            <line key={`string-${i}`} x1={x} y1="20" x2={x} y2="145" stroke="currentColor" className="text-slate-400 dark:text-slate-500" strokeWidth={1 + (5-i)*0.2} />
+            <line key={`string-${i}`} x1={x} y1="20" x2={x} y2="145" stroke="black" strokeWidth="2" />
           ))}
 
           {/* Fret number */}
           {startFret > 1 && (
-            <text x="0" y="35" fontSize="10" fill="currentColor" className="text-slate-400 dark:text-slate-500 font-mono">{startFret}</text>
+            <text x="0" y="35" fontSize="12" fill="black" fontWeight="bold" className="font-mono">{startFret}</text>
           )}
 
           {/* Dots (Muted or Open) */}
@@ -60,14 +60,14 @@ export const ChordChart: React.FC<ChordChartProps> = ({ chord, onClick, onAddTog
             if (fret === "x") {
               return (
                 <g key={`muted-${stringIdx}`}>
-                  <line x1={x - 4} y1="10" x2={x + 4} y2="18" stroke="#ef4444" strokeWidth="2" />
-                  <line x1={x + 4} y1="10" x2={x - 4} y2="18" stroke="#ef4444" strokeWidth="2" />
+                  <line x1={x - 5} y1="8" x2={x + 5} y2="18" stroke="black" strokeWidth="3" />
+                  <line x1={x + 5} y1="8" x2={x - 5} y2="18" stroke="black" strokeWidth="3" />
                 </g>
               );
             }
             if (fret === 0) {
               return (
-                <circle key={`open-${stringIdx}`} cx={x} cy="10" r="4" fill="none" stroke="#10b981" strokeWidth="2" />
+                <circle key={`open-${stringIdx}`} cx={x} cy="10" r="5" fill="none" stroke="black" strokeWidth="3" />
               );
             }
             
@@ -76,7 +76,7 @@ export const ChordChart: React.FC<ChordChartProps> = ({ chord, onClick, onAddTog
             if (relativeFret >= 1 && relativeFret <= numFrets) {
               const y = fretY[relativeFret - 1] + (fretY[relativeFret] - fretY[relativeFret - 1]) / 2;
               return (
-                <circle key={`pressed-${stringIdx}`} cx={x} cy={y} r="6" fill="#2563eb" />
+                <circle key={`pressed-${stringIdx}`} cx={x} cy={y} r="8" fill="black" />
               );
             }
             return null;
@@ -93,12 +93,12 @@ export const ChordChart: React.FC<ChordChartProps> = ({ chord, onClick, onAddTog
               onChange={(e) => onAddToggle(e.target.checked)}
               className="peer sr-only"
             />
-            <div className="w-4 h-4 border-2 border-slate-300 dark:border-slate-600 rounded peer-checked:bg-blue-600 peer-checked:border-blue-600 transition-all"></div>
-            <svg className="absolute w-3 h-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none left-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+            <div className="w-5 h-5 border-2 border-black rounded-none peer-checked:bg-black transition-all"></div>
+            <svg className="absolute w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none left-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
           </div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-blue-500 transition-colors">
+          <span className="text-xs font-bold uppercase tracking-widest text-black">
             {isAdded ? 'Added' : 'Add'}
           </span>
         </label>

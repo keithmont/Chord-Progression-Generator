@@ -1,7 +1,119 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap');
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-mono: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+@layer base {
+  :root {
+    --zine-bg: #F5F5DC;
+    --zine-ink: #000000;
+    --zine-card: #FFFFFF;
+    --zine-accent: #FF4500;
+  }
+
+  .dark {
+    --zine-bg: #424243;
+    --zine-ink: #000000;
+    --zine-card: #a5a5a5;
+    --zine-accent: #FF4500;
+  }
+
+  body {
+    background-color: var(--zine-bg);
+    color: var(--zine-ink);
+    font-family: var(--font-sans);
+    position: relative;
+    min-height: 100vh;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  .dark body {
+    color: #FFFFFF;
+  }
+
+  /* Risograph/Paper Texture Overlay */
+  body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.04;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3%3Ffilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  button {
+    cursor: pointer;
+  }
+}
+
+@layer components {
+  .zine-border {
+    border: 3px solid var(--zine-ink);
+    border-radius: 0 !important;
+  }
+
+  .zine-card {
+    background-color: var(--zine-card);
+    color: #000000;
+    border: 3px solid var(--zine-ink);
+    border-radius: 0 !important;
+    box-shadow: 6px 6px 0px var(--zine-ink);
+  }
+
+  .zine-button {
+    background-color: var(--zine-ink);
+    color: white;
+    border: 3px solid var(--zine-ink);
+    border-radius: 0 !important;
+    padding: 0.75rem 1.5rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    transition: all 0.1s ease;
+  }
+
+  .zine-button:hover {
+    background-color: white;
+    color: var(--zine-ink);
+  }
+
+  .zine-button:active {
+    transform: translate(2px, 2px);
+  }
+
+  .zine-input {
+    background-color: var(--zine-card);
+    color: #000000;
+    border: 3px solid var(--zine-ink);
+    border-radius: 0 !important;
+    padding: 0.75rem;
+    font-family: var(--font-mono);
+  }
+
+  .zine-select {
+    background-color: var(--zine-card);
+    color: #000000;
+    border: 3px solid var(--zine-ink);
+    border-radius: 0 !important;
+    padding: 0.75rem;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='square' stroke-linejoin='inherit'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem;
+  }
 }

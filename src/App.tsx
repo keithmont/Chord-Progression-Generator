@@ -1,354 +1,274 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Music, RefreshCw, ChevronRight, Guitar, Info, Play, Sun, Moon } from 'lucide-react';
-import { generateVoicings, VoicingSet } from './services/geminiService';
-import { ChordChart } from './components/ChordChart';
-import { playChord, playProgression } from './services/soundService';
-import { CustomProgressionBuilder } from './components/CustomProgressionBuilder';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChordCard, Display, Key, KeyGrid, Knob, Module, ProgressionList, fretsText } from './components/Machine';
+import { Sequencer, Step } from './components/Sequencer';
+import { PROGRESSIONS } from './data/progressions';
+import { InstrumentId, PATTERNS, PatternId, engine, playSequence, playShape } from './lib/audio';
+import { KEYS, parseProgression } from './lib/theory';
+import { Fret, Voicing, VoicingSet, buildVoicingSets } from './lib/voicings';
 
-const KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'];
-const COMMON_PROGRESSIONS = [
-  { label: 'I - V - vi - IV (Pop)', value: 'I-V-vi-IV' },
-  { label: 'vi - IV - I - V (Emotional)', value: 'vi-IV-I-V' },
-  { label: 'I - IV - V (Blues/Rock)', value: 'I-IV-V' },
-  { label: 'ii - V - I (Jazz)', value: 'ii-V-I' },
-  { label: 'I - vi - IV - V (50s)', value: 'I-vi-IV-V' },
-  { label: 'I - V - IV - V (Anthemic)', value: 'I-V-IV-V' },
-  { label: 'IV - V - iii - vi (Math Rock)', value: 'IV-V-iii-vi' },
-  { label: 'I - iii - IV - iv (Math Rock)', value: 'I-iii-IV-iv' },
-  { label: 'Surprise Me!', value: 'surprise' },
+type Theme = 'light' | 'dark';
+type Source = { kind: 'set'; index: number } | { kind: 'seq' };
+
+const INSTRUMENTS: { id: InstrumentId; name: string }[] = [
+  { id: 'acoustic', name: 'Steel' },
+  { id: 'nylon', name: 'Nylon' },
+  { id: 'electric', name: 'Electric' },
 ];
 
-interface CustomChord {
-  id: string;
-  chordName: string;
-  frets: (number | "x")[];
+function load<T>(k: string, fallback: T): T {
+  try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
 }
+function save(k: string, v: unknown) {
+  try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ }
+}
+const pick = <T,>(xs: T[]): T => xs[Math.floor(Math.random() * xs.length)];
 
 export default function App() {
-  const [selectedKey, setSelectedKey] = useState('C');
-  const [selectedProgression, setSelectedProgression] = useState('I-V-vi-IV');
-  const [customProgression, setCustomProgression] = useState('');
-  const [isCustom, setIsCustom] = useState(false);
-  const [voicingSets, setVoicingSets] = useState<VoicingSet[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [darkMode, setDarkMode] = useState(false);
-  
-  // Custom builder state
-  const [customChords, setCustomChords] = useState<CustomChord[]>([]);
+  const [theme, setTheme] = useState<Theme>(() => load<Theme | null>('cm.theme', null) ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+  const [key, setKey] = useState(() => load('cm.key', 'C'));
+  const [progId, setProgId] = useState<string | null>(() => load<string | null>('cm.prog', 'pop'));
+  const [custom, setCustom] = useState(() => load('cm.custom', ''));
+  const [useCustom, setUseCustom] = useState(false);
+  const [bpm, setBpm] = useState(() => load('cm.bpm', 92));
+  const [strumMs, setStrumMs] = useState(() => load('cm.strum', 28));
+  const [ring, setRing] = useState(() => load('cm.ring', 60));
+  const [volume, setVolume] = useState(() => load('cm.vol', 80));
+  const [pattern, setPattern] = useState<PatternId>(() => load('cm.pattern', 'whole'));
+  const [instrument, setInstrument] = useState<InstrumentId>(() => load('cm.inst', 'acoustic'));
+  const [loop, setLoop] = useState(true);
+  const [generated, setGenerated] = useState(false);
+  const [variant, setVariant] = useState(0);
+  const [steps, setSteps] = useState<Step[]>(() => load('cm.steps', []));
+  const [source, setSource] = useState<Source | null>(null);
+  const [activeStep, setActiveStep] = useState<number | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const stopRef = useRef<(() => void) | null>(null);
 
-  const currentProgression = isCustom ? customProgression : selectedProgression;
-
+  useEffect(() => { document.documentElement.dataset.theme = theme; save('cm.theme', theme); }, [theme]);
   useEffect(() => {
-    const root = window.document.documentElement;
-    if (darkMode) {
-      root.classList.add('dark');
-      root.style.colorScheme = 'dark';
-    } else {
-      root.classList.remove('dark');
-      root.style.colorScheme = 'light';
-    }
-  }, [darkMode]);
+    save('cm.key', key); save('cm.prog', progId); save('cm.custom', custom); save('cm.bpm', bpm); save('cm.strum', strumMs);
+    save('cm.ring', ring); save('cm.vol', volume); save('cm.pattern', pattern); save('cm.inst', instrument); save('cm.steps', steps);
+  }, [key, progId, custom, bpm, strumMs, ring, volume, pattern, instrument, steps]);
+  useEffect(() => { engine.setVolume(volume / 100); }, [volume]);
+  useEffect(() => {
+    engine.instrument = instrument;
+    if (engine.ctx) { setLoading(true); engine.load(instrument).catch(() => {}).finally(() => setLoading(false)); }
+  }, [instrument]);
 
-  const handleGenerate = async () => {
-    if (!currentProgression) return;
-    
-    setIsLoading(true);
-    setError(null);
+  // live transport settings, read by the scheduler at each bar
+  const live = useRef({ bpm, strumMs, ring, pattern, loop });
+  live.current = { bpm, strumMs, ring, pattern, loop };
+
+  const progressionText = useCustom ? custom : PROGRESSIONS.find((p) => p.id === progId)?.numerals ?? '';
+  const parsed = useMemo(() => parseProgression(progressionText, key), [progressionText, key]);
+  const sets: VoicingSet[] = useMemo(
+    () => (generated && !parsed.bad && parsed.chords.length ? buildVoicingSets(parsed.chords, variant) : []),
+    [generated, parsed, variant],
+  );
+
+  const stop = useCallback(() => {
+    stopRef.current?.();
+    stopRef.current = null;
+    setSource(null);
+    setActiveStep(null);
+  }, []);
+
+  // new voicings on screen stop a set that is playing
+  useEffect(() => { if (source?.kind === 'set') stop(); }, [sets]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sameSource = (a: Source | null, b: Source) =>
+    !!a && a.kind === b.kind && (a.kind === 'seq' || (b.kind === 'set' && a.index === b.index));
+
+  const play = async (shapes: Fret[][], src: Source) => {
+    const toggleOff = sameSource(source, src);
+    stop();
+    if (toggleOff || !shapes.length) return;
+    setSource(src);
+    setLoading(!engine.ctx);
     try {
-      const result = await generateVoicings(selectedKey, currentProgression);
-      if (result.length === 0) {
-        setError("Failed to generate voicings. Please try again.");
-      } else {
-        setVoicingSets(result);
-      }
-    } catch (err) {
-      setError("An error occurred while generating voicings.");
+      stopRef.current = await playSequence(shapes, () => ({
+        ...live.current,
+        ring: live.current.ring / 100,
+        onStep: (i) => { setActiveStep(i); if (i === null) setSource(null); },
+      }));
+    } catch {
+      setSource(null);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const surpriseKey = () => {
-    const randomKey = KEYS[Math.floor(Math.random() * KEYS.length)];
-    setSelectedKey(randomKey);
+  const strumOne = async (v: Voicing, id: string) => {
+    setFlash(id);
+    window.setTimeout(() => setFlash((f) => (f === id ? null : f)), 450);
+    setLoading(!engine.ctx);
+    try { await playShape(v.frets, strumMs, ring / 100); } catch { /* audio unavailable */ } finally { setLoading(false); }
   };
 
-  const surpriseProgression = () => {
-    const options = COMMON_PROGRESSIONS.filter(p => p.value !== 'surprise');
-    const randomProg = options[Math.floor(Math.random() * options.length)].value;
-    setSelectedProgression(randomProg);
-    setIsCustom(false);
+  const generate = () => {
+    if (generated) setVariant((v) => v + 1);
+    setGenerated(true);
+    engine.resume().then(() => engine.load(instrument)).catch(() => {});
+  };
+  const surprise = () => {
+    setKey(pick(KEYS));
+    setProgId(pick(PROGRESSIONS).id);
+    setUseCustom(false);
+    setVariant(Math.floor(Math.random() * 4));
+    setGenerated(true);
   };
 
-  // useEffect(() => {
-  //   handleGenerate();
-  // }, [selectedKey, selectedProgression]);
-
-  const toggleChordInBuilder = (voicing: any, setIdx: number, vIdx: number) => {
-    const chordId = `${voicing.chordName}-${setIdx}-${vIdx}`;
-    const exists = customChords.find(c => c.id === chordId);
-    
-    if (exists) {
-      setCustomChords(prev => prev.filter(c => c.id !== chordId));
-    } else {
-      setCustomChords(prev => [...prev, {
-        id: chordId,
-        chordName: voicing.chordName,
-        frets: voicing.frets
-      }]);
-    }
+  const stepId = (v: Voicing) => `${v.name}|${fretsText(v.frets)}`;
+  const toggleStep = (v: Voicing) => {
+    const id = stepId(v);
+    setSteps((s) => (s.some((x) => x.id === id) ? s.filter((x) => x.id !== id) : s.length >= 8 ? s : [...s, { ...v, id }]));
   };
+
+  // ---- LCD ----
+  const numerals = parsed.chords.map((c) => c.numeral).join('-');
+  const playingSet = source?.kind === 'set' ? sets[source.index] : null;
+  const playingChord = activeStep == null ? null : source?.kind === 'seq' ? steps[activeStep] : playingSet?.voicings[activeStep];
+  const total = source?.kind === 'seq' ? steps.length : playingSet?.voicings.length;
+  const line1 = `${key} MAJ  ${parsed.bad ? '??' : numerals || '--'}`.slice(0, 22);
+  const line2 = loading
+    ? 'LOADING SAMPLES...'
+    : playingChord && activeStep != null
+      ? `PLAY ${activeStep + 1}/${total}  ${playingChord.name}`.slice(0, 44)
+      : `BPM ${String(bpm).padStart(3, '0')}  ${INSTRUMENTS.find((i) => i.id === instrument)!.name.toUpperCase()}`;
+  const caption: [string, string] = [
+    playingSet ? playingSet.name : source?.kind === 'seq' ? 'Sequence' : generated ? `${sets.length} sets` : 'Ready',
+    PATTERNS[pattern].name,
+  ];
+  const full = steps.length >= 8;
 
   return (
-    <div className="min-h-screen pb-20 transition-colors duration-300">
-      {/* Header */}
-      <header className="bg-white zine-border border-t-0 border-l-0 border-r-0 sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto px-4 py-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tighter text-black uppercase">Find Your Voicing</h1>
+    <div className="app">
+      <header className="topbar">
+        <div className="brand">
+          <div className="brand-row">
+            <span className="cm-label">Chord machine · six-string</span>
+            <Key size="sm" label={theme === 'dark' ? 'Panel' : 'Night'} onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`} />
           </div>
-          
-          <div className="flex items-center gap-6">
-            <div className="text-xs font-bold text-black uppercase tracking-[0.2em] hidden sm:flex items-center gap-4">
-              <span>Guitar Voicing Assistant</span>
-              <button
-                onClick={() => setDarkMode(!darkMode)}
-                className="p-1.5 zine-border bg-white hover:bg-black hover:text-white transition-colors"
-                aria-label="Toggle theme"
-              >
-                {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              </button>
-            </div>
-          </div>
+          <h1>Find your voicing</h1>
         </div>
+        <Display lines={[line1, line2]} caption={caption} />
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-12">
-        {/* Controls Section */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-16">
-          {/* Key Selection */}
-          <div className="zine-card p-8">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Music className="w-6 h-6 text-black" />
-                <h2 className="text-xl font-bold text-black">Select Key</h2>
+      <div className="controls">
+        <Module title="01 · Key" aside={<span className="cm-label">Circle of fifths</span>}>
+          <KeyGrid keys={KEYS} value={key} onChange={setKey} />
+        </Module>
+
+        <Module title="02 · Progression" aside={
+          <Key size="sm" label="Custom" led={useCustom} pressed={useCustom} onClick={() => setUseCustom((u) => !u)} />
+        }>
+          {useCustom ? (
+            <>
+              <label className="sr-only" htmlFor="custom">Custom progression in Roman numerals</label>
+              <div className="custom">
+                <input id="custom" className="cm-input" value={custom} placeholder="e.g. I vi ii7 V7" autoComplete="off" spellCheck={false}
+                  onChange={(e) => setCustom(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') generate(); }} />
               </div>
-              <button
-                onClick={surpriseKey}
-                className="text-xs font-bold text-black hover:underline flex items-center gap-1 uppercase tracking-widest"
-              >
-                <RefreshCw className="w-3 h-3" />
-                Surprise Me
-              </button>
-            </div>
-            <div className="grid grid-cols-5 gap-3">
-              {KEYS.map((k) => (
-                <button
-                  key={k}
-                  onClick={() => setSelectedKey(k)}
-                  className={`py-3 text-sm font-bold transition-all zine-border ${
-                    selectedKey === k
-                      ? 'bg-black text-white'
-                      : 'bg-white text-black hover:bg-[#F5F5DC]'
-                  }`}
-                >
-                  {k}
-                </button>
-              ))}
-            </div>
-          </div>
+              <p className={'custom-help' + (parsed.bad ? ' error' : '')}>
+                {parsed.bad
+                  ? `Can't read “${parsed.bad}”. Use numerals like I ii iii IV V vi vii°, with b/# and 7, maj7, 9, add9, sus2, sus4, 6.`
+                  : custom.trim()
+                    ? `In ${key}: ${parsed.chords.map((c) => c.root + (c.quality === 'maj' ? '' : c.quality)).join('  ')}`
+                    : 'Uppercase is major, lowercase minor. Separate with spaces or dashes.'}
+              </p>
+            </>
+          ) : (
+            <ProgressionList items={PROGRESSIONS} value={progId} onChange={setProgId} />
+          )}
+        </Module>
+      </div>
 
-          {/* Progression Selection */}
-          <div className="zine-card p-8">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <ChevronRight className="w-6 h-6 text-black" />
-                <h2 className="text-xl font-bold text-black">Progression</h2>
-              </div>
-              <button
-                onClick={surpriseProgression}
-                className="text-xs font-bold text-black hover:underline flex items-center gap-1 uppercase tracking-widest"
-              >
-                <RefreshCw className="w-3 h-3" />
-                Surprise Me
-              </button>
-            </div>
-            
-            <div className="space-y-6">
-              <select
-                disabled={isCustom}
-                value={selectedProgression}
-                onChange={(e) => {
-                  if (e.target.value === 'surprise') {
-                    surpriseProgression();
-                  } else {
-                    setSelectedProgression(e.target.value);
-                  }
-                }}
-                className="w-full zine-select text-sm font-bold uppercase tracking-tight"
-              >
-                {COMMON_PROGRESSIONS.map((p) => (
-                  <option key={p.value} value={p.value}>{p.label}</option>
-                ))}
-              </select>
-
-              <div className="flex items-center gap-3">
-                <div className="relative flex items-center">
-                  <input
-                    type="checkbox"
-                    id="custom-toggle"
-                    checked={isCustom}
-                    onChange={(e) => setIsCustom(e.target.checked)}
-                    className="peer sr-only"
-                  />
-                  <div className="w-5 h-5 border-2 border-black rounded-none peer-checked:bg-black transition-all"></div>
-                  <svg className="absolute w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none left-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                  </svg>
-                </div>
-                <label htmlFor="custom-toggle" className="text-sm font-bold text-black uppercase tracking-widest cursor-pointer">
-                  Custom Progression
-                </label>
-              </div>
-
-              {isCustom && (
-                <div className="flex gap-3">
-                  <input
-                    type="text"
-                    placeholder="E.G. I - IV - VI - V"
-                    value={customProgression}
-                    onChange={(e) => setCustomProgression(e.target.value)}
-                    className="flex-1 zine-input text-sm font-bold uppercase"
-                  />
-                  <button
-                    onClick={handleGenerate}
-                    className="zine-button py-2 px-6"
-                  >
-                    Apply
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
-
-        {/* Generate Button */}
-        <div className="flex justify-center mb-16">
-          <button
-            onClick={handleGenerate}
-            disabled={isLoading}
-            className="zine-button px-12 py-5 text-xl flex items-center gap-4 group"
-          >
-            <RefreshCw className={`w-6 h-6 ${isLoading ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
-            {voicingSets.length > 0 ? 'Regenerate' : 'Generate'}
-          </button>
+      <section className="cm-module strip" aria-label="Sound">
+        <div className="knobs">
+          <Knob label="Tempo" value={bpm} min={40} max={200} unit="bpm" onChange={setBpm} />
+          <Knob label="Strum" value={strumMs} min={0} max={80} unit="ms" onChange={setStrumMs} />
+          <Knob label="Ring" value={ring} min={0} max={100} unit="%" onChange={setRing} />
+          <Knob label="Level" value={volume} min={0} max={100} unit="%" onChange={setVolume} />
         </div>
-
-        {/* Custom Progression Builder Section */}
-        <CustomProgressionBuilder 
-          chords={customChords}
-          onReorder={setCustomChords}
-          onRemove={(id) => setCustomChords(prev => prev.filter(c => c.id !== id))}
-          onClear={() => setCustomChords([])}
-        />
-
-        {/* Results Section */}
-        {voicingSets.length > 0 || isLoading ? (
-          <section>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-10 gap-4">
-              <div className="flex items-center gap-4">
-                <h2 className="text-3xl font-bold text-black">Voicing Options</h2>
-              </div>
-            </div>
-
-            {isLoading && (
-              <div className="flex flex-col items-center justify-center py-12 zine-card mb-12">
-                <dotlottie-wc 
-                  src="https://lottie.host/a7eca740-9b96-4804-9b2c-9bfdb70550dc/Fy8ued9bPa.lottie" 
-                  style={{ width: '200px', height: '200px' }} 
-                  autoplay 
-                  loop
-                />
-                <span className="text-xl font-bold uppercase tracking-[0.2em] mt-4 text-black">Architecting...</span>
-              </div>
-            )}
-
-            {error && (
-              <div className="zine-border bg-white p-6 mb-12 flex items-center gap-4">
-                <Info className="w-6 h-6 text-black" />
-                <p className="text-sm font-bold uppercase tracking-tight">{error}</p>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 gap-16">
-              <AnimatePresence mode="wait">
-                {voicingSets.map((set, setIdx) => (
-                  <motion.div
-                    key={`${set.name}-${setIdx}`}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="zine-card p-10"
-                  >
-                    <div className="mb-10 flex flex-col sm:flex-row sm:items-start justify-between gap-6">
-                      <div>
-                        <h3 className="text-2xl font-bold text-black mb-2">{set.name}</h3>
-                        <p className="text-xs font-bold text-black opacity-60 uppercase tracking-widest max-w-2xl">{set.description}</p>
-                      </div>
-                      <button
-                        onClick={() => playProgression(set.voicings.map(v => v.frets))}
-                        className="zine-button flex items-center gap-2 whitespace-nowrap"
-                      >
-                        <Play className="w-4 h-4 fill-current" />
-                        Play Progression
-                      </button>
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-10 justify-center sm:justify-start">
-                      {set.voicings.map((voicing, vIdx) => (
-                        <div key={vIdx} className="relative group">
-                          <ChordChart 
-                            chord={voicing} 
-                            onClick={() => playChord(voicing.frets)}
-                            onAddToggle={() => toggleChordInBuilder(voicing, setIdx, vIdx)}
-                            isAdded={!!customChords.find(c => c.id === `${voicing.chordName}-${setIdx}-${vIdx}`)}
-                          />
-                          {vIdx < set.voicings.length - 1 && (
-                            <div className="hidden xl:flex absolute -right-6 top-1/2 -translate-y-1/2 text-black opacity-20">
-                              <ChevronRight className="w-6 h-6" />
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-          </section>
-        ) : (
-          <div className="zine-card p-16 text-center border-dashed">
-            <h3 className="text-2xl font-bold text-black mb-4">Ready to Architect?</h3>
-            <p className="text-xs font-bold text-black opacity-60 uppercase tracking-[0.2em] max-w-md mx-auto leading-relaxed">
-              Select your key and progression above, then click "Generate" to see your options.
-            </p>
+        <div className="seg">
+          <span className="cm-label">Guitar</span>
+          <div className="seg-row" role="radiogroup" aria-label="Guitar">
+            {INSTRUMENTS.map((i) => (
+              <button key={i.id} type="button" role="radio" aria-checked={instrument === i.id} className="cm-key cm-key-word" onClick={() => setInstrument(i.id)}>{i.name}</button>
+            ))}
           </div>
-        )}
+        </div>
+        <div className="seg">
+          <span className="cm-label">Strum pattern</span>
+          <div className="seg-row" role="radiogroup" aria-label="Strum pattern">
+            {(Object.keys(PATTERNS) as PatternId[]).map((p) => (
+              <button key={p} type="button" role="radio" aria-checked={pattern === p} className="cm-key cm-key-word" onClick={() => setPattern(p)}>{PATTERNS[p].name}</button>
+            ))}
+          </div>
+        </div>
+        <div className="strip-actions">
+          <Key label="Surprise" onClick={surprise} />
+          <Key label={generated ? 'Shuffle' : 'Generate'} variant="signal" size="lg" onClick={generate} disabled={!!parsed.bad || !parsed.chords.length} />
+        </div>
+      </section>
 
-        {/* Regenerate Button removed from here as it's now above */}
-      </main>
-
-      {/* Footer Info */}
-      <footer className="max-w-6xl mx-auto px-4 py-12 border-t-4 border-black mt-20 text-center">
-        <p className="text-black font-bold text-xs uppercase tracking-[0.3em] leading-loose">
-          Explore different ways to play your favorite progressions. 
-          <br className="hidden sm:block" />
-          Charts show fret numbers on the left and muted strings with an 'X'.
+      <Module title="03 · Sequence" aside={
+        <div className="seg-row">
+          <Key size="sm" label="Loop" led={loop} pressed={loop} onClick={() => setLoop((l) => !l)} />
+          <Key size="sm" label="Clear" onClick={() => { if (source?.kind === 'seq') stop(); setSteps([]); }} disabled={!steps.length} />
+          <Key size="sm" label={source?.kind === 'seq' ? 'Stop' : 'Play'} led={source?.kind === 'seq'} disabled={!steps.length}
+            onClick={() => play(steps.map((s) => s.frets), { kind: 'seq' })} />
+        </div>
+      }>
+        <Sequencer steps={steps} active={source?.kind === 'seq' ? activeStep : null} onChange={setSteps}
+          onPlayStep={(s) => strumOne(s, 'seq-' + s.id)} />
+        <p className="custom-help">
+          {steps.length === 0 ? 'Press Add under any chord to build your own progression here. Drag steps to reorder.'
+            : full ? 'Sequence full — remove a step to add another.' : 'Drag to reorder. Double-click a step to hear it.'}
         </p>
+      </Module>
+
+      <section className="sets" aria-label="Voicings">
+        {sets.length === 0 ? (
+          <div className="empty">
+            <span className="cm-label">04 · Voicings</span>
+            <h3>{parsed.bad ? 'Check the progression' : 'Ready when you are'}</h3>
+            <p>Pick a key and a progression, then press Generate to lay out six ways to play it. Click any chord to hear it.</p>
+          </div>
+        ) : (
+          sets.map((set, si) => {
+            const isPlaying = source?.kind === 'set' && source.index === si;
+            return (
+              <section key={set.style} className="cm-module" aria-label={set.name}>
+                <div className="cm-set-head">
+                  <div>
+                    <p className="cm-label cm-set-num">04.{si + 1} · {set.style}</p>
+                    <h3 className="cm-set-name">{set.name}</h3>
+                    <p className="cm-set-desc">{set.description}</p>
+                  </div>
+                  <Key label={isPlaying ? 'Stop' : 'Play'} led={isPlaying} onClick={() => play(set.voicings.map((v) => v.frets), { kind: 'set', index: si })} />
+                </div>
+                <div className="cm-set-row">
+                  {set.voicings.map((v, vi) => {
+                    const id = `${si}-${vi}`;
+                    const added = steps.some((s) => s.id === stepId(v));
+                    return (
+                      <ChordCard key={vi} {...v} playing={(isPlaying && activeStep === vi) || flash === id} added={added}
+                        onPlay={() => strumOne(v, id)} onToggle={!added && full ? undefined : () => toggleStep(v)} />
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })
+        )}
+      </section>
+
+      <footer>
+        <span>Diagrams run low E → high e. ○ open, × muted; a number marks the starting fret.</span>
+        <span>Guitar samples: <a href="https://github.com/nbrosowsky/tonejs-instruments" target="_blank" rel="noreferrer">tonejs-instruments</a></span>
       </footer>
     </div>
   );

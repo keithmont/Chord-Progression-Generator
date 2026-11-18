@@ -1,0 +1,66 @@
+/* Chord Machine tokens — generated from the design system's tokens.json */
+:root, [data-theme="light"] {
+  --chassis: #dcd8cf;
+  --panel: #ebe8e1;
+  --keycap: #f7f5f0;
+  --line: #8f897d;
+  --ink: #161614;
+  --ink-muted: #55524b;
+  --signal: #ff4500;
+  --on-signal: #161614;
+  --signal-ink: #b03000;
+  --lcd: #12150f;
+  --lcd-ink: #ffb03a;
+  --lcd-ghost: #3a2f1a;
+  --tonic: #2a52be;
+  --on-tonic: #ffffff;
+  --subdominant: #f2c230;
+  --on-subdominant: #161614;
+  --dominant: var(--signal);
+  --on-dominant: var(--on-signal);
+  --led-off: #b9b3a7;
+  --shadow-key: 0 3px 0 #161614;
+  --shadow-module: 0 1px 0 #ffffff inset, 0 2px 0 #00000026;
+  --led-glow: 0 0 6px #ff4500;
+  --focus-ring: 0 0 0 2px #dcd8cf, 0 0 0 4px #161614;
+}
+[data-theme="dark"] {
+  --chassis: #1c1c1b;
+  --panel: #2a2927;
+  --keycap: #3a3936;
+  --line: #6b675f;
+  --ink: #eeebe4;
+  --ink-muted: #a9a49a;
+  --signal: #ff5a1f;
+  --on-signal: #161614;
+  --signal-ink: #ff7a45;
+  --lcd: #0b0c09;
+  --lcd-ink: #ffb03a;
+  --lcd-ghost: #2e2515;
+  --tonic: #7b98f0;
+  --on-tonic: #10131c;
+  --subdominant: #f2c230;
+  --on-subdominant: #161614;
+  --dominant: var(--signal);
+  --on-dominant: var(--on-signal);
+  --led-off: #4a4843;
+  --shadow-key: 0 3px 0 #000000;
+  --shadow-module: 0 1px 0 #ffffff14 inset, 0 2px 0 #00000080;
+  --led-glow: 0 0 8px #ff5a1f;
+  --focus-ring: 0 0 0 2px #1c1c1b, 0 0 0 4px #eeebe4;
+}
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-full: 9999px;
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Roboto Mono", ui-monospace, Menlo, monospace;
+  --font-lcd: "VT323", "JetBrains Mono", ui-monospace, monospace;
+}

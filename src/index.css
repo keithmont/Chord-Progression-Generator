@@ -145,3 +145,6 @@ footer a { color: var(--signal-ink); }
   .knobs { gap: var(--space-2); justify-content: space-between; width: 100%; }
   .cm-knob-wrap { width: 64px; }
 }
+
+/* Major / Minor switch under the key bank */
+.mode-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--line); padding-bottom: 3px; }

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChordCard, Display, Key, KeyGrid, Knob, Module, ProgressionList, fretsText } from './components/Machine';
 import { Sequencer, Step } from './components/Sequencer';
-import { PROGRESSIONS } from './data/progressions';
+import { PROGRESSIONS_BY_MODE } from './data/progressions';
 import { InstrumentId, PATTERNS, PatternId, engine, playSequence, playShape } from './lib/audio';
-import { KEYS, parseProgression } from './lib/theory';
+import { KEYS_BY_MODE, Mode, keyForMode, parseProgression } from './lib/theory';
 import { Fret, Voicing, VoicingSet, buildVoicingSets } from './lib/voicings';
 
 type Theme = 'light' | 'dark';
@@ -26,7 +26,14 @@ const pick = <T,>(xs: T[]): T => xs[Math.floor(Math.random() * xs.length)];
 export default function App() {
   const [theme, setTheme] = useState<Theme>(() => load<Theme | null>('cm.theme', null) ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
   const [key, setKey] = useState(() => load('cm.key', 'C'));
-  const [progId, setProgId] = useState<string | null>(() => load<string | null>('cm.prog', 'pop'));
+  const [mode, setMode] = useState<Mode>(() => load<Mode>('cm.mode', 'major'));
+  // remember the chosen progression separately for each mode
+  const [progByMode, setProgByMode] = useState<Record<Mode, string>>(() => load('cm.progs', { major: 'pop', minor: 'm-epic' }));
+  const progId = progByMode[mode];
+  const setProgId = (id: string) => setProgByMode((p) => ({ ...p, [mode]: id }));
+  const bank = PROGRESSIONS_BY_MODE[mode];
+  const keys = KEYS_BY_MODE[mode];
+  const changeMode = (m: Mode) => { setMode(m); setKey((k) => keyForMode(k, m)); };
   const [custom, setCustom] = useState(() => load('cm.custom', ''));
   const [useCustom, setUseCustom] = useState(false);
   const [bpm, setBpm] = useState(() => load('cm.bpm', 92));
@@ -47,9 +54,9 @@ export default function App() {
 
   useEffect(() => { document.documentElement.dataset.theme = theme; save('cm.theme', theme); }, [theme]);
   useEffect(() => {
-    save('cm.key', key); save('cm.prog', progId); save('cm.custom', custom); save('cm.bpm', bpm); save('cm.strum', strumMs);
+    save('cm.key', key); save('cm.mode', mode); save('cm.progs', progByMode); save('cm.custom', custom); save('cm.bpm', bpm); save('cm.strum', strumMs);
     save('cm.ring', ring); save('cm.vol', volume); save('cm.pattern', pattern); save('cm.inst', instrument); save('cm.steps', steps);
-  }, [key, progId, custom, bpm, strumMs, ring, volume, pattern, instrument, steps]);
+  }, [key, mode, progByMode, custom, bpm, strumMs, ring, volume, pattern, instrument, steps]);
   useEffect(() => { engine.setVolume(volume / 100); }, [volume]);
   useEffect(() => {
     engine.instrument = instrument;
@@ -60,8 +67,8 @@ export default function App() {
   const live = useRef({ bpm, strumMs, ring, pattern, loop });
   live.current = { bpm, strumMs, ring, pattern, loop };
 
-  const progressionText = useCustom ? custom : PROGRESSIONS.find((p) => p.id === progId)?.numerals ?? '';
-  const parsed = useMemo(() => parseProgression(progressionText, key), [progressionText, key]);
+  const progressionText = useCustom ? custom : bank.find((p) => p.id === progId)?.numerals ?? '';
+  const parsed = useMemo(() => parseProgression(progressionText, key, mode), [progressionText, key, mode]);
   const sets: VoicingSet[] = useMemo(
     () => (generated && !parsed.bad && parsed.chords.length ? buildVoicingSets(parsed.chords, variant) : []),
     [generated, parsed, variant],
@@ -112,8 +119,8 @@ export default function App() {
     engine.resume().then(() => engine.load(instrument)).catch(() => {});
   };
   const surprise = () => {
-    setKey(pick(KEYS));
-    setProgId(pick(PROGRESSIONS).id);
+    setKey(pick(keys));
+    setProgId(pick(bank).id);
     setUseCustom(false);
     setVariant(Math.floor(Math.random() * 4));
     setGenerated(true);
@@ -130,7 +137,7 @@ export default function App() {
   const playingSet = source?.kind === 'set' ? sets[source.index] : null;
   const playingChord = activeStep == null ? null : source?.kind === 'seq' ? steps[activeStep] : playingSet?.voicings[activeStep];
   const total = source?.kind === 'seq' ? steps.length : playingSet?.voicings.length;
-  const line1 = `${key} MAJ  ${parsed.bad ? '??' : numerals || '--'}`.slice(0, 22);
+  const line1 = `${key} ${mode === 'major' ? 'MAJ' : 'MIN'}  ${parsed.bad ? '??' : numerals || '--'}`.slice(0, 22);
   const line2 = loading
     ? 'LOADING SAMPLES...'
     : playingChord && activeStep != null
@@ -158,7 +165,15 @@ export default function App() {
 
       <div className="controls">
         <Module title="01 · Key" aside={<span className="cm-label">Circle of fifths</span>}>
-          <KeyGrid keys={KEYS} value={key} onChange={setKey} />
+          <KeyGrid keys={keys} value={key} onChange={setKey} />
+          <div className="mode-row" role="radiogroup" aria-label="Mode">
+            {(['major', 'minor'] as Mode[]).map((m) => (
+              <button key={m} type="button" role="radio" aria-checked={mode === m} className="cm-key cm-key-word" onClick={() => changeMode(m)}>
+                <span className={'cm-led' + (mode === m ? ' on' : '')} aria-hidden="true" />
+                {m === 'major' ? 'Major' : 'Minor'}
+              </button>
+            ))}
+          </div>
         </Module>
 
         <Module title="02 · Progression" aside={
@@ -176,11 +191,11 @@ export default function App() {
                   ? `Can't read “${parsed.bad}”. Use numerals like I ii iii IV V vi vii°, with b/# and 7, maj7, 9, add9, sus2, sus4, 6.`
                   : custom.trim()
                     ? `In ${key}: ${parsed.chords.map((c) => c.root + (c.quality === 'maj' ? '' : c.quality)).join('  ')}`
-                    : 'Uppercase is major, lowercase minor. Separate with spaces or dashes.'}
+                    : `Uppercase is major, lowercase minor. Separate with spaces or dashes.${mode === 'minor' ? ' Degrees follow natural minor: i ii° III iv v VI VII.' : ''}`}
               </p>
             </>
           ) : (
-            <ProgressionList items={PROGRESSIONS} value={progId} onChange={setProgId} />
+            <ProgressionList items={bank} value={progId} onChange={setProgId} />
           )}
         </Module>
       </div>

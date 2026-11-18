@@ -13,6 +13,7 @@ const INSTRUMENTS: { id: InstrumentId; name: string }[] = [
   { id: 'acoustic', name: 'Steel' },
   { id: 'nylon', name: 'Nylon' },
   { id: 'electric', name: 'Electric' },
+  { id: 'pad', name: 'Pad' },
 ];
 
 function load<T>(k: string, fallback: T): T {
@@ -132,6 +133,7 @@ export default function App() {
     setSteps((s) => (s.some((x) => x.id === id) ? s.filter((x) => x.id !== id) : s.length >= 8 ? s : [...s, { ...v, id }]));
   };
 
+  const isPad = instrument === 'pad';
   // ---- LCD ----
   const numerals = parsed.chords.map((c) => c.numeral).join('-');
   const playingSet = source?.kind === 'set' ? sets[source.index] : null;
@@ -139,13 +141,13 @@ export default function App() {
   const total = source?.kind === 'seq' ? steps.length : playingSet?.voicings.length;
   const line1 = `${key} ${mode === 'major' ? 'MAJ' : 'MIN'}  ${parsed.bad ? '??' : numerals || '--'}`.slice(0, 22);
   const line2 = loading
-    ? 'LOADING SAMPLES...'
+    ? (isPad ? 'WARMING UP...' : 'LOADING SAMPLES...')
     : playingChord && activeStep != null
       ? `PLAY ${activeStep + 1}/${total}  ${playingChord.name}`.slice(0, 44)
       : `BPM ${String(bpm).padStart(3, '0')}  ${INSTRUMENTS.find((i) => i.id === instrument)!.name.toUpperCase()}`;
   const caption: [string, string] = [
     playingSet ? playingSet.name : source?.kind === 'seq' ? 'Sequence' : generated ? `${sets.length} sets` : 'Ready',
-    PATTERNS[pattern].name,
+    isPad ? 'Sustain' : PATTERNS[pattern].name,
   ];
   const full = steps.length >= 8;
 
@@ -203,23 +205,23 @@ export default function App() {
       <section className="cm-module strip" aria-label="Sound">
         <div className="knobs">
           <Knob label="Tempo" value={bpm} min={40} max={200} unit="bpm" onChange={setBpm} />
-          <Knob label="Strum" value={strumMs} min={0} max={80} unit="ms" onChange={setStrumMs} />
+          <Knob label={isPad ? 'Spread' : 'Strum'} value={strumMs} min={0} max={80} unit="ms" onChange={setStrumMs} />
           <Knob label="Ring" value={ring} min={0} max={100} unit="%" onChange={setRing} />
           <Knob label="Level" value={volume} min={0} max={100} unit="%" onChange={setVolume} />
         </div>
         <div className="seg">
-          <span className="cm-label">Guitar</span>
-          <div className="seg-row" role="radiogroup" aria-label="Guitar">
+          <span className="cm-label">Sound</span>
+          <div className="seg-row" role="radiogroup" aria-label="Sound">
             {INSTRUMENTS.map((i) => (
               <button key={i.id} type="button" role="radio" aria-checked={instrument === i.id} className="cm-key cm-key-word" onClick={() => setInstrument(i.id)}>{i.name}</button>
             ))}
           </div>
         </div>
         <div className="seg">
-          <span className="cm-label">Strum pattern</span>
+          <span className="cm-label">{isPad ? 'Strum pattern · off for pad' : 'Strum pattern'}</span>
           <div className="seg-row" role="radiogroup" aria-label="Strum pattern">
             {(Object.keys(PATTERNS) as PatternId[]).map((p) => (
-              <button key={p} type="button" role="radio" aria-checked={pattern === p} className="cm-key cm-key-word" onClick={() => setPattern(p)}>{PATTERNS[p].name}</button>
+              <button key={p} type="button" role="radio" aria-checked={pattern === p} disabled={isPad} className="cm-key cm-key-word" onClick={() => setPattern(p)}>{PATTERNS[p].name}</button>
             ))}
           </div>
         </div>

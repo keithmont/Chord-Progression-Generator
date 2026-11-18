@@ -27,8 +27,8 @@ const FALLBACK: Record<StyleId, StyleId[]> = {
 };
 
 function candidates(c: ProgressionChord, style: StyleId): { q: Quality; f: number[] }[] {
-  // a major chord acting as V reads as a dominant seventh in the seventh-based styles
-  const written: Quality = c.fn === 'dom' && c.quality === 'maj' && (style === 'shell' || style === 'twinkle') ? '7' : c.quality;
+  // a major chord on degree V reads as a dominant seventh in the seventh-based styles
+  const written: Quality = c.degree === 4 && c.quality === 'maj' && (style === 'shell' || style === 'twinkle') ? '7' : c.quality;
   for (const s of [style, ...FALLBACK[style]]) {
     for (const q of styleQualities(s, written)) {
       const list = lib[`${c.rootPc}:${q}`]?.[s];

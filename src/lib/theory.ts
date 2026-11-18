@@ -38,12 +38,25 @@ export const QUALITIES: Record<Quality, QualityDef> = {
 
 export const ALL_QUALITIES = Object.keys(QUALITIES) as Quality[];
 
-// Keys in the original app's order (circle of fifths, sharps then flats).
-export const KEYS = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'];
+export type Mode = 'major' | 'minor';
+
+// Tonics in circle-of-fifths order (sharps then flats), spelled as each mode's key signatures are.
+export const KEYS_BY_MODE: Record<Mode, string[]> = {
+  major: ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb'],
+  minor: ['A', 'E', 'B', 'F#', 'C#', 'G#', 'D#', 'A#', 'D', 'G', 'C', 'F', 'Bb', 'Eb', 'Ab'],
+};
+export const KEYS = KEYS_BY_MODE.major;
+
+/** The same tonic spelled for the other mode's list (C stays C; Gb major → F# minor). */
+export function keyForMode(key: string, mode: Mode): string {
+  const list = KEYS_BY_MODE[mode];
+  if (list.includes(key)) return key;
+  return list.find((k) => pitchClass(k) === pitchClass(key)) ?? list[0];
+}
 
 const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const LETTER_PC = [0, 2, 4, 5, 7, 9, 11];
-const MAJOR = [0, 2, 4, 5, 7, 9, 11];
+const SCALES: Record<Mode, number[]> = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10] };
 
 export function pitchClass(name: string): number {
   const li = LETTERS.indexOf(name[0].toUpperCase());
@@ -52,11 +65,11 @@ export function pitchClass(name: string): number {
   return ((pc % 12) + 12) % 12;
 }
 
-/** Spell the note on scale degree `deg` (0-6) of a major key, shifted by `shift` semitones. */
-export function spellDegree(key: string, deg: number, shift = 0): string {
+/** Spell the note on scale degree `deg` (0-6) of a key, shifted by `shift` semitones. */
+export function spellDegree(key: string, deg: number, shift = 0, mode: Mode = 'major'): string {
   const keyLetter = LETTERS.indexOf(key[0]);
   const letterIdx = (keyLetter + deg) % 7;
-  const target = (pitchClass(key) + MAJOR[deg] + shift + 120) % 12;
+  const target = (pitchClass(key) + SCALES[mode][deg] + shift + 120) % 12;
   let diff = (target - LETTER_PC[letterIdx] + 12) % 12;
   if (diff > 6) diff -= 12;
   const acc = diff > 0 ? '#'.repeat(diff) : 'b'.repeat(-diff);
@@ -71,13 +84,17 @@ export interface ProgressionChord {
   rootPc: number;
   quality: Quality;
   fn: ChordFn;
+  degree: number; // 0-6 scale degree
 }
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
 const FN_BY_DEGREE: ChordFn[] = ['tonic', 'sub', 'tonic', 'sub', 'dom', 'tonic', 'dom'];
+// natural minor: i III tonic; ii° iv VI predominant; v/V VII dominant
+const FN_BY_DEGREE_MINOR: ChordFn[] = ['tonic', 'sub', 'tonic', 'sub', 'dom', 'sub', 'dom'];
 
-/** Parse one Roman numeral (e.g. "bVII", "ii7", "IVmaj7", "vii°", "Vsus4", "iv") in a major key. */
-export function parseNumeral(raw: string, key: string): ProgressionChord | null {
+/** Parse one Roman numeral (e.g. "bVII", "ii7", "IVmaj7", "vii°", "Vsus4", "iv"). Degrees follow the
+ *  mode's scale (in minor, III is the relative major); case sets the chord quality. */
+export function parseNumeral(raw: string, key: string, mode: Mode = 'major'): ProgressionChord | null {
   const s = raw.trim();
   const m = /^([b#♭♯]?)(VII|VI|V|IV|III|II|I|vii|vi|v|iv|iii|ii|i)(.*)$/.exec(s);
   if (!m) return null;
@@ -105,17 +122,17 @@ export function parseNumeral(raw: string, key: string): ProgressionChord | null 
   else if (rest === '') quality = upper ? 'maj' : 'm';
   else return null;
 
-  const root = spellDegree(key, deg, acc);
-  const fn: ChordFn = acc !== 0 ? 'other' : (rn === 'iv' ? 'sub' : FN_BY_DEGREE[deg]);
-  return { numeral: s, root, rootPc: pitchClass(root), quality, fn };
+  const root = spellDegree(key, deg, acc, mode);
+  const fn: ChordFn = acc !== 0 ? 'other' : mode === 'minor' ? FN_BY_DEGREE_MINOR[deg] : rn === 'iv' ? 'sub' : FN_BY_DEGREE[deg];
+  return { numeral: s, root, rootPc: pitchClass(root), quality, fn, degree: deg };
 }
 
 /** Split "I - V - vi - IV" / "I V vi IV" / "I, V, vi" into chords. Returns null with the bad token on error. */
-export function parseProgression(text: string, key: string): { chords: ProgressionChord[]; bad?: string } {
+export function parseProgression(text: string, key: string, mode: Mode = 'major'): { chords: ProgressionChord[]; bad?: string } {
   const tokens = text.split(/[\s,–—|-]+/).filter(Boolean);
   const chords: ProgressionChord[] = [];
   for (const t of tokens) {
-    const c = parseNumeral(t, key);
+    const c = parseNumeral(t, key, mode);
     if (!c) return { chords, bad: t };
     chords.push(c);
   }

@@ -5,10 +5,11 @@
 import { TUNING } from './styles';
 import type { Fret } from './voicings';
 
-export type InstrumentId = 'acoustic' | 'nylon' | 'electric';
+export type SampledId = 'acoustic' | 'nylon' | 'electric';
+export type InstrumentId = SampledId | 'pad';
 
 // Recordings in public/samples/<instrument>/ (tonejs-instruments, MIT).
-const SAMPLE_NOTES: Record<InstrumentId, string[]> = {
+const SAMPLE_NOTES: Record<SampledId, string[]> = {
   acoustic: ['D2', 'Ds2', 'E2', 'F2', 'Fs2', 'G2', 'Gs2', 'A2', 'As2', 'B2', 'C3', 'Cs3', 'D3', 'Ds3', 'E3', 'F3', 'Fs3', 'G3', 'Gs3', 'A3', 'As3', 'B3', 'C4', 'Cs4', 'D4', 'Ds4', 'E4', 'F4', 'Fs4', 'G4', 'Gs4', 'A4', 'As4', 'B4', 'C5', 'Cs5', 'D5'],
   nylon: ['B1', 'D2', 'E2', 'Fs2', 'Gs2', 'A2', 'B2', 'Cs3', 'D3', 'E3', 'Fs3', 'G3', 'A3', 'B3', 'Cs4', 'Ds4', 'E4', 'Fs4', 'Gs4', 'A4', 'B4', 'Cs5', 'D5', 'E5', 'Fs5', 'G5', 'Gs5', 'A5', 'As5'],
   electric: ['Cs2', 'E2', 'Fs2', 'A2', 'C3', 'Ds3', 'Fs3', 'A3', 'C4', 'Ds4', 'Fs4', 'A4', 'C5', 'Ds5', 'Fs5', 'A5', 'C6'],
@@ -32,6 +33,8 @@ class Engine {
   ctx: AudioContext | null = null;
   private out!: GainNode;
   private buffers = new Map<InstrumentId, Promise<Map<number, AudioBuffer>>>();
+  private padVoices: { gain: GainNode; oscs: OscillatorNode[] }[] = [];
+  private padOut!: GainNode;
   private stringVoices: ({ src: AudioBufferSourceNode; gain: GainNode } | null)[] = [null, null, null, null, null, null];
   instrument: InstrumentId = 'acoustic';
   volume = 0.8;
@@ -57,6 +60,10 @@ class Engine {
     comp.connect(master).connect(ctx.destination);
     this.out = ctx.createGain();
     this.out.connect(dry); this.out.connect(verb);
+    // the pad sits further back: same dry path plus a bigger reverb send
+    this.padOut = ctx.createGain();
+    const padSend = ctx.createGain(); padSend.gain.value = 3.2;
+    this.padOut.connect(dry); this.padOut.connect(padSend).connect(verb);
     this.masterGain = master;
     this.ctx = ctx;
     return ctx;
@@ -71,10 +78,14 @@ class Engine {
   load(inst: InstrumentId): Promise<Map<number, AudioBuffer>> {
     const ctx = this.ensure();
     let p = this.buffers.get(inst);
+    if (!p && inst === 'pad') {
+      p = Promise.resolve(new Map()); // synthesised: nothing to load
+      this.buffers.set(inst, p);
+    }
     if (!p) {
       const base = import.meta.env.BASE_URL;
       p = Promise.all(
-        SAMPLE_NOTES[inst].map(async (n) => {
+        SAMPLE_NOTES[inst as SampledId].map(async (n) => {
           const res = await fetch(`${base}samples/${inst}/${n}.mp3`);
           const buf = await ctx.decodeAudioData(await res.arrayBuffer());
           return [noteToMidi(n), buf] as const;
@@ -138,6 +149,62 @@ class Engine {
     });
   }
 
+  /**
+   * A soft synth pad: per note, two detuned saws spread left/right plus a sine an octave down,
+   * through a low-pass filter with a slow wobble, faded in and out. A new chord cross-fades the last.
+   */
+  pad(frets: Fret[], when: number, o: { duration: number; ring: number; spreadMs: number }) {
+    const ctx = this.ctx!;
+    const notes = [...new Set(frets.flatMap((f, s) => (f === 'x' ? [] : [TUNING[s] + f])))].sort((a, b) => a - b);
+    if (!notes.length) return;
+    // lift very low notes an octave so the pad stays soft; keep the bass note as is
+    const voiced = notes.map((m, i) => (i > 0 && m < 52 ? m + 12 : m));
+    const attack = 0.35 + o.ring * 0.5;
+    const release = 0.6 + o.ring * 3;
+    for (const v of this.padVoices) {
+      v.gain.gain.cancelScheduledValues(when);
+      v.gain.gain.setTargetAtTime(0, when, 0.35);
+      v.oscs.forEach((osc) => { try { osc.stop(when + 2.5); } catch { /* already stopping */ } });
+    }
+    this.padVoices = [];
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass'; filter.Q.value = 0.6;
+    filter.frequency.setValueAtTime(500, when);
+    filter.frequency.linearRampToValueAtTime(1500 + o.ring * 600, when + attack * 1.5);
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.18;
+    const lfoAmt = ctx.createGain(); lfoAmt.gain.value = 220;
+    lfo.connect(lfoAmt).connect(filter.frequency);
+    filter.connect(this.padOut);
+
+    const end = when + o.duration + release * 4;
+    const level = 0.22 / Math.sqrt(voiced.length);
+    voiced.forEach((m, i) => {
+      const t = when + (i * o.spreadMs) / 1000;
+      const hz = 440 * Math.pow(2, (m - 69) / 12);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(level, t + attack);
+      g.gain.setValueAtTime(level, when + o.duration);
+      g.gain.setTargetAtTime(0, when + o.duration, release / 3);
+      g.connect(filter);
+      const oscs: OscillatorNode[] = [];
+      for (const [type, mult, cents, pan, amt] of [
+        ['sawtooth', 1, -7, -0.6, 0.5], ['sawtooth', 1, 7, 0.6, 0.5], ['sine', 0.5, 0, 0, 0.6],
+      ] as const) {
+        const osc = ctx.createOscillator();
+        osc.type = type; osc.frequency.value = hz * mult; osc.detune.value = cents;
+        const a = ctx.createGain(); a.gain.value = amt;
+        const p = ctx.createStereoPanner(); p.pan.value = pan;
+        osc.connect(a).connect(p).connect(g);
+        osc.start(t); osc.stop(end);
+        oscs.push(osc);
+      }
+      this.padVoices.push({ gain: g, oscs });
+    });
+    lfo.start(when); lfo.stop(end);
+  }
+
   /** Stop everything quickly. */
   hush() {
     if (!this.ctx) return;
@@ -149,6 +216,12 @@ class Engine {
       try { v.src.stop(t + 0.3); } catch { /* already stopped */ }
       this.stringVoices[i] = null;
     });
+    for (const v of this.padVoices) {
+      v.gain.gain.cancelScheduledValues(t);
+      v.gain.gain.setTargetAtTime(0, t, 0.08);
+      v.oscs.forEach((o) => { try { o.stop(t + 0.6); } catch { /* already stopped */ } });
+    }
+    this.padVoices = [];
   }
 }
 
@@ -193,8 +266,11 @@ export async function playSequence(shapes: Fret[][], opts: () => TransportOption
     }
     const beat = 60 / o.bpm;
     const idx = bar;
-    const hits = PATTERNS[o.pattern].hits;
-    hits.forEach(([pos, up], h) => {
+    if (engine.instrument === 'pad') {
+      // one sustained chord per bar, overlapping into the next
+      engine.pad(shapes[idx], barStart, { duration: 4 * beat, ring: o.ring, spreadMs: o.strumMs });
+    } else PATTERNS[o.pattern].hits.forEach(([pos, up], h) => {
+      const hits = PATTERNS[o.pattern].hits;
       const next = h + 1 < hits.length ? hits[h + 1][0] : 4;
       engine.strum(bufs, shapes[idx], barStart + pos * beat, {
         strumMs: up ? o.strumMs * 0.7 : o.strumMs, ring: o.ring, up,
@@ -218,9 +294,10 @@ export async function playSequence(shapes: Fret[][], opts: () => TransportOption
   };
 }
 
-/** One chord, one down-strum, now. */
+/** One chord now: a down-strum, or a swell on the pad. */
 export async function playShape(frets: Fret[], strumMs: number, ring: number) {
   const ctx = await engine.resume();
   const bufs = await engine.load(engine.instrument);
-  engine.strum(bufs, frets, ctx.currentTime + 0.02, { strumMs, ring, duration: 1.2 + ring * 2 });
+  if (engine.instrument === 'pad') engine.pad(frets, ctx.currentTime + 0.02, { duration: 1.6 + ring * 2, ring, spreadMs: strumMs });
+  else engine.strum(bufs, frets, ctx.currentTime + 0.02, { strumMs, ring, duration: 1.2 + ring * 2 });
 }
